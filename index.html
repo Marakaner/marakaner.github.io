@@ -116,6 +116,8 @@
     <!-- Ergebnisanzeige -->
     <div class="totals">
       <h3>Gesamtpreis: <span id="totalPrice">0€</span></h3>
+      <!-- NEU: Anzeige der Teile-Übersicht -->
+      <p id="summary" style="margin-top: 8px;"></p>
     </div>
   </div>
 
@@ -129,7 +131,7 @@
         { teil: "Platter reifen",   preis: 150, nurWerkstatt: false },
         { teil: "Ölfilter",         preis: 50,  nurWerkstatt: true  },
         { teil: "Motoröl",          preis: 75,  nurWerkstatt: true  },
-        { teil: "Zündkerzen",       preis: 175, onlyWorkshop: true  }, // Tippfehler? Behalten wir's konsistent
+        { teil: "Zündkerzen",       preis: 175, onlyWorkshop: true  }, // Tippfehler beibehalten
         { teil: "Benzinfilter",     preis: 75,  nurWerkstatt: true  },
         { teil: "Luftfilter",       preis: 55,  nurWerkstatt: true  },
         { teil: "Kühlflüssigkeit",  preis: 60,  nurWerkstatt: false },
@@ -299,6 +301,8 @@
 
       // Gesamtpreis zurücksetzen
       document.getElementById('totalPrice').textContent = '0€';
+      // Übersicht zurücksetzen
+      document.getElementById('summary').textContent = '';
     }
 
     // Aktualisiert den Einzelposten und den Gesamtpreis
@@ -314,15 +318,26 @@
       updateTotal();
     }
 
-    // Summiert alle Zeilen zum Gesamtpreis
+    // Summiert alle Zeilen zum Gesamtpreis + Ausgabe der Liste gewählter Teile
     function updateTotal() {
       let total = 0;
+      // Array für die Teil-Liste
+      let summaryItems = [];
+
       priceData[currentClass].forEach((item, index) => {
         const qtyField = document.getElementById(`qty-${index}`);
         const qty = parseInt(qtyField.value) || 0;
         total += qty * item.preis;
+
+        // Nur hinzufügen, wenn Anzahl > 0
+        if(qty > 0) {
+          summaryItems.push(`${qty}x ${item.teil}`);
+        }
       });
+
       document.getElementById('totalPrice').textContent = total + '€';
+      // Zusammengefasste Ausgabe
+      document.getElementById('summary').textContent = summaryItems.join(', ');
     }
 
     // Setzt alle Eingaben auf 0 zurück
@@ -332,9 +347,11 @@
         document.getElementById(`rowSum-${index}`).textContent = '0€';
       });
       document.getElementById('totalPrice').textContent = '0€';
+      // Übersicht zurücksetzen
+      document.getElementById('summary').textContent = '';
     }
 
-    // Beim ersten Laden Tabelle für Standard-Klasse anzeigen
+    // Beim ersten Laden Tabelle für die Anfangsklasse anzeigen
     window.addEventListener('load', () => {
       renderTable();
     });
