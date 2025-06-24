@@ -57,7 +57,6 @@
 
         const details = document.createElement('div');
         details.className = 'px-4 pb-2 hidden text-gray-700 dark:text-gray-300';
-        // Haftstrafe-Text anpassen: falls schon 'M.' enthalten, nicht 'Monate' anhängen
         let haft = o.Haftstrafe || 'keine Angabe';
         const haftText = typeof haft === 'string' && /M\b/.test(haft) ? haft : `${haft} Monate`;
         const hasLicense = o.Strafe && /(Waffenscheinentzug|Führerscheinentzug)/i.test(o.Strafe);
@@ -68,7 +67,7 @@
           <p><strong>Haftstrafe:</strong> ${haftText}</p>
           <p><strong>Sozialstrafe:</strong> ${o.Sozialstrafe || 'keine Angabe'}</p>
           <p><strong>${hasLicense ? 'Lizenzen' : 'Geldstrafe'}:</strong> ${hasLicense ? licenseLabel : (o.Strafe ? o.Strafe + ' €' : 'keine')}</p>
-          <p><strong>DNA:</strong> ${o.DNA || 'n.v.'}</p>
+          <p><strong>DNA:</strong> ${o.DNA || 'nicht erforderlich'}</p>
         `;
 
         arrow.onclick = (e) => {
@@ -125,6 +124,7 @@
       let dnaRequirement = '';
 
       stack.forEach(o => {
+        // Summen
         totalMonths += parseInt(o.Haftstrafe) || 0;
         if (o.Strafe && /Waffenscheinentzug/i.test(o.Strafe)) {
           licenseList.push('Waffenschein');
@@ -133,12 +133,20 @@
         } else {
           totalFine += parseFloat(o.Strafe.replace(/\D/g, '')) || 0;
         }
-        if (o['Art.'].startsWith('§ 1') || o['Art.'].startsWith('§ 2')) {
-          needsFeststellung = true;
+        // Strafmaßfeststellung nur für §1 und §2.1–§2.4
+        const match = o['Art.'].match(/^§\s*(\d+)(?:\.(\d+))?/);
+        if (match) {
+          const major = parseInt(match[1], 10);
+          const minor = match[2] ? parseInt(match[2], 10) : 0;
+          if (major === 1 || (major === 2 && minor <= 4)) {
+            needsFeststellung = true;
+          }
         }
       });
 
+      // Einmalige Listen
       licenseList = [...new Set(licenseList)];
+      // DNA
       for (const level of dnaLevels) {
         if (stack.some(o => o.DNA === level)) {
           dnaRequirement = level;
@@ -150,7 +158,7 @@
       if (totalFine > 0) html += `<p><strong>Gesamt Geldstrafe:</strong> ${totalFine} €</p>`;
       if (licenseList.length) html += `<p><strong>Lizenzen:</strong> ${licenseList.join(', ')}</p>`;
       html += `<p><strong>DNA-Abnahme:</strong> ${dnaRequirement || 'nicht erforderlich'}</p>`;
-      if (needsFeststellung) html += `<p class="text-red-600 dark:text-red-400 font-semibold">Achtung: Hier muss eine Strafmaßfestellung erfolgen!</p>`;
+      if (needsFeststellung) html += `<p class="text-red-600 dark:text-red-400 font-semibold">Achtung: Hier muss eine Strafmaßfeststellung erfolgen!</p>`;
       if (licenseList.length) html += `<p class="text-red-600 dark:text-red-400 font-semibold">Achtung: Hier muss eine Lizenz entzogen werden!</p>`;
 
       summaryDiv.innerHTML = html;
