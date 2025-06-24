@@ -57,25 +57,49 @@
 
         const details = document.createElement('div');
         details.className = 'px-4 pb-2 hidden text-gray-700 dark:text-gray-300';
-        let haft = o.Haftstrafe || 'keine Angabe';
-        const haftText = typeof haft === 'string' && /M\b/.test(haft) ? haft : `${haft} Monate`;
-        const hasLicense = o.Strafe && /(Waffenscheinentzug|Führerscheinentzug)/i.test(o.Strafe);
-        const licenseLabel = o.Strafe.includes('Waffenscheinentzug') ? 'Waffenschein' : o.Strafe.includes('Führerscheinentzug') ? 'Führerschein' : '';
+
+        let haft = o.Haftstrafe || '';
+        // Haftstrafe nur mit 'Monate' wenn nur Zahl
+        let haftText = '';
+        if (/^[0-9]+$/.test(haft)) {
+          haftText = `${haft} Monate`;
+        } else if (typeof haft === 'string' && /M/.test(haft)) {
+          haftText = haft;
+        } else if (haft.toLowerCase() === 'nein') {
+          haftText = 'Nein';
+        } else {
+          haftText = haft || 'keine Angabe';
+        }
+        let licenseLabel = '';
+        let specialNote = '';
+        let strafeText = o.Strafe ? (o.Strafe.includes('$') ? o.Strafe : o.Strafe + ' €') : 'keine';
+
+        if (/Waffenscheinentzug/i.test(o.Strafe)) {
+          licenseLabel = 'Waffenschein';
+        } else if (/Führerscheinentzug/i.test(o.Strafe)) {
+          licenseLabel = 'Führerschein';
+        } else if (/Flugscheinentzug/i.test(o.Strafe)) {
+          licenseLabel = 'Flugschein';
+        }
+        if (o['Art.'] === '§ 6.10') {
+          strafeText = '$ 5000';
+          licenseLabel = 'Führerschein';
+          specialNote = '<p><strong>2x innerhalb 24 Stunden:</strong> 24 Stunden Sperre</p>';
+        }
 
         details.innerHTML = `
           <p><strong>Beschreibung:</strong> ${o.Beschreibung || 'keine Angabe'}</p>
           <p><strong>Haftstrafe:</strong> ${haftText}</p>
           <p><strong>Sozialstrafe:</strong> ${o.Sozialstrafe || 'keine Angabe'}</p>
-          <p><strong>${hasLicense ? 'Lizenzen' : 'Geldstrafe'}:</strong> ${hasLicense ? licenseLabel : (o.Strafe ? o.Strafe + ' €' : 'keine')}</p>
+          <p><strong>${licenseLabel ? 'Lizenzen' : 'Geldstrafe'}:</strong> ${licenseLabel || strafeText}</p>
+          ${specialNote}
           <p><strong>DNA:</strong> ${o.DNA || 'nicht erforderlich'}</p>
         `;
-
         arrow.onclick = (e) => {
           e.stopPropagation();
           const isHidden = details.classList.toggle('hidden');
           arrow.classList.toggle('rotate-180', !isHidden);
         };
-
         header.append(textSpan, arrow);
         li.append(header, details);
         resultsList.appendChild(li);
@@ -103,8 +127,10 @@
       stack.forEach((o, i) => {
         const li = document.createElement('li');
         li.className = 'p-2 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center';
-        li.innerHTML = `<span>${o['Art.']} - ${o.Tat} <span class=\"text-sm text-gray-500 dark:text-gray-400\">DNA: ${o.DNA}</span></span>
-                        <button class=\"text-red-500 dark:text-red-400\" onclick=\"removeFromStack(${i})\">Entfernen</button>`;
+        li.innerHTML = `
+          <span>${o['Art.']} - ${o.Tat} <span class="text-sm text-gray-500 dark:text-gray-400">DNA: ${o.DNA}</span></span>
+          <button class="text-red-500 dark:text-red-400" onclick="removeFromStack(${i})">Entfernen</button>
+        `;
         stackList.appendChild(li);
       });
     }
@@ -117,48 +143,46 @@
 
     function updateSummary() {
       let totalMonths = 0;
+      let totalSocial = 0;
       let totalFine = 0;
       let needsFeststellung = false;
       let licenseList = [];
-      const dnaLevels = ['A', 'B', 'C', 'D'];
+      const dnaLevels = ['A','B','C','D'];
       let dnaRequirement = '';
 
       stack.forEach(o => {
-        // Summen
         totalMonths += parseInt(o.Haftstrafe) || 0;
-        if (o.Strafe && /Waffenscheinentzug/i.test(o.Strafe)) {
-          licenseList.push('Waffenschein');
-        } else if (o.Strafe && /Führerscheinentzug/i.test(o.Strafe)) {
+        totalSocial += parseInt(o.Sozialstrafe) || 0;
+        if (o['Art.'] === '§ 6.10') {
+          totalFine += 5000;
           licenseList.push('Führerschein');
+        } else if (/Waffenscheinentzug/i.test(o.Strafe)) {
+          licenseList.push('Waffenschein');
+        } else if (/Führerscheinentzug/i.test(o.Strafe)) {
+          licenseList.push('Führerschein');
+        } else if (/Flugscheinentzug/i.test(o.Strafe)) {
+          licenseList.push('Flugschein');
         } else {
-          totalFine += parseFloat(o.Strafe.replace(/\D/g, '')) || 0;
+          totalFine += parseFloat((o.Strafe || '').replace(/\D/g, '')) || 0;
         }
-        // Strafmaßfeststellung nur für §1 und §2.1–§2.4
         const match = o['Art.'].match(/^§\s*(\d+)(?:\.(\d+))?/);
         if (match) {
           const major = parseInt(match[1], 10);
           const minor = match[2] ? parseInt(match[2], 10) : 0;
-          if (major === 1 || (major === 2 && minor <= 4)) {
-            needsFeststellung = true;
-          }
+          if (major === 1 || (major === 2 && minor <= 4)) needsFeststellung = true;
         }
       });
 
-      // Einmalige Listen
       licenseList = [...new Set(licenseList)];
-      // DNA
-      for (const level of dnaLevels) {
-        if (stack.some(o => o.DNA === level)) {
-          dnaRequirement = level;
-          break;
-        }
-      }
+      dnaRequirement = dnaLevels.find(level => stack.some(o => o.DNA === level)) || '';
 
-      let html = `<p><strong>Gesamt Haftstrafe:</strong> ${totalMonths} Monate</p>`;
-      if (totalFine > 0) html += `<p><strong>Gesamt Geldstrafe:</strong> ${totalFine} €</p>`;
+      let html = '';
+      if (totalMonths > 0) html += `<p><strong>Gesamt Haftstrafe:</strong> ${totalMonths} Monate</p>`;
+      if (totalSocial > 0) html += `<p><strong>Gesamt Sozialstrafe:</strong> ${totalSocial} Monate</p>`;
+      if (totalFine > 0) html += `<p><strong>Gesamt Geldstrafe:</strong> $ ${totalFine}</p>`;
       if (licenseList.length) html += `<p><strong>Lizenzen:</strong> ${licenseList.join(', ')}</p>`;
-      html += `<p><strong>DNA-Abnahme:</strong> ${dnaRequirement || 'nicht erforderlich'}</p>`;
-      if (needsFeststellung) html += `<p class="text-red-600 dark:text-red-400 font-semibold">Achtung: Hier muss eine Strafmaßfeststellung erfolgen!</p>`;
+      if (dnaRequirement) html += `<p><strong>DNA-Abnahme:</strong> ${dnaRequirement}</p>`;
+      if (needsFeststellung) html += `<p class="text-red-600 dark:text-red-400 font-semibold">Achtung: Hier muss eine Strafmaßfestellung erfolgen!</p>`;
       if (licenseList.length) html += `<p class="text-red-600 dark:text-red-400 font-semibold">Achtung: Hier muss eine Lizenz entzogen werden!</p>`;
 
       summaryDiv.innerHTML = html;
