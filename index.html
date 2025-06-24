@@ -1,360 +1,156 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="de" class="dark">
 <head>
-  <meta charset="UTF-8" />
-  <title>Werkstatt-Preiskalkulator</title>
-  <!-- Google Fonts: Roboto und Material Icons -->
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" />
-  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
-  <style>
-    /* Dark-Mode-Grundlayout nach Material Design */
-    body {
-      margin: 0; 
-      padding: 0;
-      font-family: 'Roboto', sans-serif;
-      background-color: #121212;
-      color: #ffffff;
-    }
-    header {
-      background-color: #1f1f1f;
-      padding: 16px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    h1, h2, h3 {
-      margin: 0;
-      font-weight: normal;
-    }
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 16px;
-    }
-    label {
-      display: inline-block;
-      margin-right: 8px;
-    }
-    select {
-      padding: 8px;
-      background-color: #2c2c2c;
-      color: #ffffff;
-      border: none;
-      outline: none;
-      border-radius: 4px;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 16px;
-    }
-    th, td {
-      text-align: left;
-      padding: 8px;
-      border-bottom: 1px solid #333333;
-    }
-    th {
-      background-color: #2c2c2c;
-    }
-    input[type="number"] {
-      width: 60px;
-      padding: 4px;
-      background-color: #1f1f1f;
-      color: #ffffff;
-      border: 1px solid #444444;
-      border-radius: 4px;
-    }
-    .totals {
-      margin-top: 24px;
-      text-align: right;
-    }
-    .material-icon {
-      vertical-align: middle;
-      font-size: 20px;
-      margin-right: 6px;
-    }
-    button {
-      padding: 8px 16px;
-      background-color: #2c2c2c;
-      color: #ffffff;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      margin-left: 8px;
-    }
-    button:hover {
-      background-color: #444444;
-    }
-  </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Straftaten Suche</title>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-  <header>
-    <h1>Werkstatt-Preiskalkulator</h1>
-  </header>
-
-  <div class="container">
-    <!-- Auswahl der Klasse -->
-    <div>
-      <label for="klasseSelect">
-        <span class="material-icons material-icon">directions_car</span>Fahrzeugklasse:
-      </label>
-      <select id="klasseSelect" onchange="renderTable()">
-        <option value="Neulinge">Neulinge (0–20.000€)</option>
-        <option value="Standard">Standard (20.001–80.000€)</option>
-        <option value="Mittelklasse">Mittelklasse (80.001–180.000€)</option>
-        <option value="Luxus">Luxus (ab 180.001€)</option>
-        <option value="Motorrad">Motorrad</option>
-      </select>
-      <button onclick="resetAll()">
-        <span class="material-icons material-icon">restart_alt</span>Reset
-      </button>
-    </div>
-    
-    <!-- Tabelle mit Teilen/Preisen -->
-    <div id="partsTableContainer"></div>
-
-    <!-- Ergebnisanzeige -->
-    <div class="totals">
-      <h3>Gesamtpreis: <span id="totalPrice">0€</span></h3>
-      <!-- NEU: Anzeige der Teile-Übersicht -->
-      <p id="summary" style="margin-top: 8px;"></p>
-    </div>
+<body class="bg-gray-100 dark:bg-gray-900 p-6 text-gray-900 dark:text-gray-100">
+  <div class="max-w-3xl mx-auto bg-white dark:bg-gray-800 p-6 rounded-xl shadow">
+    <h1 class="text-2xl font-bold mb-4">Straftaten Suche</h1>
+    <input id="searchInput" type="text" placeholder="Straftat suchen..." class="w-full p-2 border rounded mb-4 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600" />
+    <ul id="resultsList" class="mb-4"></ul>
+    <h2 class="text-xl font-semibold">Ausgewählte Straftaten</h2>
+    <ul id="stackList" class="mb-4"></ul>
+    <div id="summary" class="p-4 bg-gray-50 dark:bg-gray-700 rounded"></div>
   </div>
 
   <script>
-    // Preis-Daten ohne "Außen" und "Hinweise".
-    // Wir merken nur, ob es nurWerkstatt = true/false ist.
-    const priceData = {
-      "Neulinge": [
-        { teil: "Tür",               preis: 300, nurWerkstatt: true  },
-        { teil: "Scheibe",          preis: 300, nurWerkstatt: true  },
-        { teil: "Platter reifen",   preis: 150, nurWerkstatt: false },
-        { teil: "Ölfilter",         preis: 50,  nurWerkstatt: true  },
-        { teil: "Motoröl",          preis: 75,  nurWerkstatt: true  },
-        { teil: "Zündkerzen",       preis: 175, onlyWorkshop: true  }, // Tippfehler beibehalten
-        { teil: "Benzinfilter",     preis: 75,  nurWerkstatt: true  },
-        { teil: "Luftfilter",       preis: 55,  nurWerkstatt: true  },
-        { teil: "Kühlflüssigkeit",  preis: 60,  nurWerkstatt: false },
-        { teil: "Bremsflüssigkeit", preis: 55,  nurWerkstatt: false },
-        { teil: "Bremsscheibe",     preis: 140, nurWerkstatt: true  },
-        { teil: "Bremsbeläge",      preis: 120, nurWerkstatt: false },
-        { teil: "Bremskolben",      preis: 95,  nurWerkstatt: true  },
-        { teil: "Stoßdämpfer",      preis: 180, nurWerkstatt: true  },
-        { teil: "Federn",           preis: 160, nurWerkstatt: true  },
-        { teil: "Kupplung",         preis: 210, nurWerkstatt: true  },
-        { teil: "Schwungscheibe",   preis: 275, nurWerkstatt: true  },
-        { teil: "Getriebe",         preis: 1050,nurWerkstatt: true  },
-        { teil: "Getriebeöl",       preis: 70,  nurWerkstatt: true  },
-        { teil: "Kolben",           preis: 220, nurWerkstatt: true  },
-        { teil: "Pleul",            preis: 175, nurWerkstatt: true  },
-        { teil: "Riemen",           preis: 110, nurWerkstatt: true  }
-      ],
-      "Standard": [
-        { teil: "Tür",               preis: 600,  nurWerkstatt: true  },
-        { teil: "Scheibe",          preis: 600,  nurWerkstatt: true  },
-        { teil: "Platter reifen",   preis: 300,  nurWerkstatt: false },
-        { teil: "Ölfilter",         preis: 100,  nurWerkstatt: true  },
-        { teil: "Motoröl",          preis: 150,  nurWerkstatt: true  },
-        { teil: "Zündkerzen",       preis: 350,  nurWerkstatt: true  },
-        { teil: "Benzinfilter",     preis: 150,  nurWerkstatt: true  },
-        { teil: "Luftfilter",       preis: 110,  nurWerkstatt: true  },
-        { teil: "Kühlflüssigkeit",  preis: 120,  nurWerkstatt: false },
-        { teil: "Bremsflüssigkeit", preis: 110,  nurWerkstatt: false },
-        { teil: "Bremsscheibe",     preis: 280,  nurWerkstatt: true  },
-        { teil: "Bremsbeläge",      preis: 240,  nurWerkstatt: false },
-        { teil: "Bremskolben",      preis: 190,  nurWerkstatt: true  },
-        { teil: "Stoßdämpfer",      preis: 360,  nurWerkstatt: true  },
-        { teil: "Federn",           preis: 320,  nurWerkstatt: true  },
-        { teil: "Kupplung",         preis: 420,  nurWerkstatt: true  },
-        { teil: "Schwungscheibe",   preis: 550,  nurWerkstatt: true  },
-        { teil: "Getriebe",         preis: 2100, nurWerkstatt: true  },
-        { teil: "Getriebeöl",       preis: 140,  nurWerkstatt: true  },
-        { teil: "Kolben",           preis: 440,  nurWerkstatt: true  },
-        { teil: "Pleul",            preis: 320,  nurWerkstatt: true  },
-        { teil: "Riemen",           preis: 220,  nurWerkstatt: true  }
-      ],
-      "Mittelklasse": [
-        { teil: "Tür",               preis: 900,  nurWerkstatt: true  },
-        { teil: "Scheibe",          preis: 900,  nurWerkstatt: true  },
-        { teil: "Platter reifen",   preis: 450,  nurWerkstatt: false },
-        { teil: "Ölfilter",         preis: 150,  nurWerkstatt: true  },
-        { teil: "Motoröl",          preis: 225,  nurWerkstatt: true  },
-        { teil: "Zündkerzen",       preis: 525,  nurWerkstatt: true  },
-        { teil: "Benzinfilter",     preis: 225,  nurWerkstatt: true  },
-        { teil: "Luftfilter",       preis: 165,  nurWerkstatt: true  },
-        { teil: "Kühlflüssigkeit",  preis: 180,  nurWerkstatt: false },
-        { teil: "Bremsflüssigkeit", preis: 165,  nurWerkstatt: false },
-        { teil: "Bremsscheibe",     preis: 420,  nurWerkstatt: true  },
-        { teil: "Bremsbeläge",      preis: 360,  nurWerkstatt: false },
-        { teil: "Bremskolben",      preis: 285,  nurWerkstatt: true  },
-        { teil: "Stoßdämpfer",      preis: 540,  nurWerkstatt: true  },
-        { teil: "Federn",           preis: 480,  nurWerkstatt: true  },
-        { teil: "Kupplung",         preis: 630,  nurWerkstatt: true  },
-        { teil: "Schwungscheibe",   preis: 825,  nurWerkstatt: true  },
-        { teil: "Getriebe",         preis: 3150, nurWerkstatt: true  },
-        { teil: "Getriebeöl",       preis: 210,  nurWerkstatt: true  },
-        { teil: "Kolben",           preis: 660,  nurWerkstatt: true  },
-        { teil: "Pleul",            preis: 525,  nurWerkstatt: true  },
-        { teil: "Riemen",           preis: 330,  nurWerkstatt: true  }
-      ],
-      "Luxus": [
-        { teil: "Tür",               preis: 1200, nurWerkstatt: true },
-        { teil: "Scheibe",          preis: 1200, nurWerkstatt: true },
-        { teil: "Platter reifen",   preis: 600,  nurWerkstatt: false},
-        { teil: "Ölfilter",         preis: 200,  nurWerkstatt: true },
-        { teil: "Motoröl",          preis: 300,  nurWerkstatt: true },
-        { teil: "Zündkerzen",       preis: 700,  nurWerkstatt: true },
-        { teil: "Benzinfilter",     preis: 300,  nurWerkstatt: true },
-        { teil: "Luftfilter",       preis: 220,  nurWerkstatt: true },
-        { teil: "Kühlflüssigkeit",  preis: 240,  nurWerkstatt: false},
-        { teil: "Bremsflüssigkeit", preis: 220,  nurWerkstatt: false},
-        { teil: "Bremsscheibe",     preis: 560,  nurWerkstatt: true },
-        { teil: "Bremsbeläge",      preis: 480,  nurWerkstatt: false},
-        { teil: "Bremskolben",      preis: 380,  nurWerkstatt: true },
-        { teil: "Stoßdämpfer",      preis: 720,  nurWerkstatt: true },
-        { teil: "Federn",           preis: 640,  nurWerkstatt: true },
-        { teil: "Kupplung",         preis: 840,  nurWerkstatt: true },
-        { teil: "Schwungscheibe",   preis: 1100, nurWerkstatt: true },
-        { teil: "Getriebe",         preis: 4200, nurWerkstatt: true },
-        { teil: "Getriebeöl",       preis: 280,  nurWerkstatt: true },
-        { teil: "Kolben",           preis: 880,  nurWerkstatt: true },
-        { teil: "Pleul",            preis: 700,  nurWerkstatt: true },
-        { teil: "Riemen",           preis: 440,  nurWerkstatt: true }
-      ],
-      "Motorrad": [
-        { teil: "Tür",               preis: 150,  nurWerkstatt: true  },
-        { teil: "Scheibe",          preis: 150,  nurWerkstatt: true  },
-        { teil: "Platter reifen",   preis: 150,  nurWerkstatt: false },
-        { teil: "Ölfilter",         preis: 50,   nurWerkstatt: true  },
-        { teil: "Motoröl",          preis: 75,   nurWerkstatt: true  },
-        { teil: "Zündkerzen",       preis: 175,  nurWerkstatt: true  },
-        { teil: "Benzinfilter",     preis: 75,   nurWerkstatt: true  },
-        { teil: "Luftfilter",       preis: 55,   nurWerkstatt: true  },
-        { teil: "Kühlflüssigkeit",  preis: 60,   nurWerkstatt: false },
-        { teil: "Bremsflüssigkeit", preis: 55,   nurWerkstatt: false },
-        { teil: "Bremsscheibe",     preis: 140,  nurWerkstatt: true  },
-        { teil: "Bremsbeläge",      preis: 120,  nurWerkstatt: false },
-        { teil: "Bremskolben",      preis: 95,   nurWerkstatt: true  },
-        { teil: "Stoßdämpfer",      preis: 180,  nurWerkstatt: true  },
-        { teil: "Federn",           preis: 160,  nurWerkstatt: true  },
-        { teil: "Kupplung",         preis: 210,  nurWerkstatt: true  },
-        { teil: "Schwungscheibe",   preis: 275,  nurWerkstatt: true  },
-        { teil: "Getriebe",         preis: 1050, nurWerkstatt: true  },
-        { teil: "Getriebeöl",       preis: 70,   nurWerkstatt: true  },
-        { teil: "Kolben",           preis: 220,  nurWerkstatt: true  },
-        { teil: "Pleul",            preis: 175,  nurWerkstatt: true  },
-        { teil: "Riemen",           preis: 110,  nurWerkstatt: true  }
-      ]
-    };
+    let offenses = [];
+    let showAll = false;
+    fetch('offenses.json')
+      .then(res => res.json())
+      .then(data => { offenses = data; renderResults(); })
+      .catch(err => console.error('Fehler beim Laden der Daten:', err));
 
-    let currentClass = 'Neulinge';
+    const searchInput = document.getElementById('searchInput');
+    const resultsList = document.getElementById('resultsList');
+    const stackList = document.getElementById('stackList');
+    const summaryDiv = document.getElementById('summary');
+    let stack = [];
 
-    // Rendert die Tabelle für die aktuell gewählte Klasse
-    function renderTable() {
-      currentClass = document.getElementById('klasseSelect').value;
-      const container = document.getElementById('partsTableContainer');
-      container.innerHTML = ''; // Alte Tabelle entfernen
+    searchInput.addEventListener('input', () => { showAll = false; renderResults(); });
 
-      // Erzeuge Tabelle
-      const table = document.createElement('table');
-      const thead = document.createElement('thead');
-      const tbody = document.createElement('tbody');
+    function renderResults() {
+      const query = searchInput.value.toLowerCase();
+      const filtered = offenses.filter(o => o.Tat.toLowerCase().includes(query) || o['Art.'].toLowerCase().includes(query));
+      resultsList.innerHTML = '';
+      const toShow = showAll ? filtered : filtered.slice(0, 5);
 
-      // Tabellenkopf
-      thead.innerHTML = `
-        <tr>
-          <th>Teil</th>
-          <th>Preis/Stück</th>
-          <th>Anzahl</th>
-          <th>Nur Werkstatt?</th>
-          <th>Summe</th>
-        </tr>
-      `;
-      table.appendChild(thead);
+      toShow.forEach(o => {
+        const li = document.createElement('li');
+        li.className = 'border-b border-gray-200 dark:border-gray-700';
 
-      // Tabellenkörper
-      priceData[currentClass].forEach((item, index) => {
-        const row = document.createElement('tr');
-        
-        const nurWerkstattText = item.nurWerkstatt ? 'Ja' : 'Nein';
+        const header = document.createElement('div');
+        header.className = 'p-2 flex justify-between items-center hover:bg-gray-100 dark:hover:bg-gray-700';
 
-        row.innerHTML = `
-          <td>${item.teil}</td>
-          <td>${item.preis}€</td>
-          <td>
-            <input 
-              type="number" 
-              min="0" 
-              value="0" 
-              onchange="updateRowTotal(${index})" 
-              id="qty-${index}" 
-            />
-          </td>
-          <td>${nurWerkstattText}</td>
-          <td id="rowSum-${index}">0€</td>
+        const textSpan = document.createElement('span');
+        textSpan.className = 'cursor-pointer flex-1';
+        textSpan.textContent = `${o['Art.']} - ${o.Tat}`;
+        textSpan.onclick = () => addToStack(o);
+
+        const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        arrow.setAttribute('class', 'w-4 h-4 text-gray-600 dark:text-gray-300 cursor-pointer');
+        arrow.setAttribute('viewBox', '0 0 24 24');
+        arrow.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>';
+
+        const details = document.createElement('div');
+        details.className = 'px-4 pb-2 hidden text-gray-700 dark:text-gray-300';
+        const hasLicense = o.Strafe && /(Waffenscheinentzug|Führerscheinentzug)/i.test(o.Strafe);
+        const licenseLabel = o.Strafe.includes('Waffenscheinentzug') ? 'Waffenschein' : o.Strafe.includes('Führerscheinentzug') ? 'Führerschein' : '';
+        details.innerHTML = `
+          <p><strong>Beschreibung:</strong> ${o.Beschreibung || 'keine Angabe'}</p>
+          <p><strong>Haftstrafe:</strong> ${o.Haftstrafe || 'keine Angabe'} Monate</p>
+          <p><strong>Sozialstrafe:</strong> ${o.Sozialstrafe || 'keine Angabe'}</p>
+          <p><strong>${hasLicense ? 'Lizenzen' : 'Geldstrafe'}:</strong> ${hasLicense ? licenseLabel : (o.Strafe ? o.Strafe + ' €' : 'keine')}</p>
+          <p><strong>DNA:</strong> ${o.DNA || 'n.v.'}</p>
         `;
-        tbody.appendChild(row);
+
+        arrow.onclick = (e) => {
+          e.stopPropagation();
+          const isHidden = details.classList.toggle('hidden');
+          arrow.classList.toggle('rotate-180', !isHidden);
+        };
+
+        header.append(textSpan, arrow);
+        li.append(header, details);
+        resultsList.appendChild(li);
       });
 
-      table.appendChild(tbody);
-      container.appendChild(table);
-
-      // Gesamtpreis zurücksetzen
-      document.getElementById('totalPrice').textContent = '0€';
-      // Übersicht zurücksetzen
-      document.getElementById('summary').textContent = '';
+      if (filtered.length > 5) {
+        const liMore = document.createElement('li');
+        liMore.className = 'p-2 text-center text-blue-600 dark:text-blue-400 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900';
+        liMore.textContent = showAll ? 'Weniger anzeigen' : `Mehr anzeigen (${filtered.length - 5} weitere)`;
+        liMore.onclick = () => { showAll = !showAll; renderResults(); };
+        resultsList.appendChild(liMore);
+      }
     }
 
-    // Aktualisiert den Einzelposten und den Gesamtpreis
-    function updateRowTotal(index) {
-      const qtyField = document.getElementById(`qty-${index}`);
-      const rowSumField = document.getElementById(`rowSum-${index}`);
-      const item = priceData[currentClass][index];
-
-      const qty = parseInt(qtyField.value) || 0;
-      const sum = item.preis * qty;
-
-      rowSumField.textContent = sum + '€';
-      updateTotal();
+    function addToStack(o) {
+      if (!stack.includes(o)) {
+        stack.push(o);
+        renderStack();
+        updateSummary();
+      }
     }
 
-    // Summiert alle Zeilen zum Gesamtpreis + Ausgabe der Liste gewählter Teile
-    function updateTotal() {
-      let total = 0;
-      // Array für die Teil-Liste
-      let summaryItems = [];
+    function renderStack() {
+      stackList.innerHTML = '';
+      stack.forEach((o, i) => {
+        const li = document.createElement('li');
+        li.className = 'p-2 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center';
+        li.innerHTML = `<span>${o['Art.']} - ${o.Tat} <span class=\"text-sm text-gray-500 dark:text-gray-400\">DNA: ${o.DNA}</span></span>
+                        <button class=\"text-red-500 dark:text-red-400\" onclick=\"removeFromStack(${i})\">Entfernen</button>`;
+        stackList.appendChild(li);
+      });
+    }
 
-      priceData[currentClass].forEach((item, index) => {
-        const qtyField = document.getElementById(`qty-${index}`);
-        const qty = parseInt(qtyField.value) || 0;
-        total += qty * item.preis;
+    function removeFromStack(index) {
+      stack.splice(index, 1);
+      renderStack();
+      updateSummary();
+    }
 
-        // Nur hinzufügen, wenn Anzahl > 0
-        if(qty > 0) {
-          summaryItems.push(`${qty}x ${item.teil}`);
+    function updateSummary() {
+      let totalMonths = 0;
+      let totalFine = 0;
+      let needsFeststellung = false;
+      let licenseList = [];
+      const dnaLevels = ['A', 'B', 'C', 'D'];
+      let dnaRequirement = '';
+
+      stack.forEach(o => {
+        totalMonths += parseInt(o.Haftstrafe) || 0;
+        if (o.Strafe && /Waffenscheinentzug/i.test(o.Strafe)) {
+          licenseList.push('Waffenschein');
+        } else if (o.Strafe && /Führerscheinentzug/i.test(o.Strafe)) {
+          licenseList.push('Führerschein');
+        } else {
+          totalFine += parseFloat(o.Strafe.replace(/\D/g, '')) || 0;
+        }
+        if (o['Art.'].startsWith('§ 1') || o['Art.'].startsWith('§ 2')) {
+          needsFeststellung = true;
         }
       });
 
-      document.getElementById('totalPrice').textContent = total + '€';
-      // Zusammengefasste Ausgabe
-      document.getElementById('summary').textContent = summaryItems.join(', ');
-    }
+      licenseList = [...new Set(licenseList)];
+      for (const level of dnaLevels) {
+        if (stack.some(o => o.DNA === level)) {
+          dnaRequirement = level;
+          break;
+        }
+      }
 
-    // Setzt alle Eingaben auf 0 zurück
-    function resetAll() {
-      priceData[currentClass].forEach((_, index) => {
-        document.getElementById(`qty-${index}`).value = 0;
-        document.getElementById(`rowSum-${index}`).textContent = '0€';
-      });
-      document.getElementById('totalPrice').textContent = '0€';
-      // Übersicht zurücksetzen
-      document.getElementById('summary').textContent = '';
-    }
+      let html = `<p><strong>Gesamt Haftstrafe:</strong> ${totalMonths} Monate</p>`;
+      if (totalFine > 0) html += `<p><strong>Gesamt Geldstrafe:</strong> ${totalFine} €</p>`;
+      if (licenseList.length) html += `<p><strong>Lizenzen:</strong> ${licenseList.join(', ')}</p>`;
+      html += `<p><strong>DNA-Abnahme:</strong> ${dnaRequirement || 'nicht erforderlich'}</p>`;
+      if (needsFeststellung) html += `<p class="text-red-600 dark:text-red-400 font-semibold">Achtung: Hier muss eine Strafmaßfeststellung erfolgen!</p>`;
+      if (licenseList.length) html += `<p class="text-red-600 dark:text-red-400 font-semibold">Achtung: Hier muss eine Lizenz entzogen werden!</p>`;
 
-    // Beim ersten Laden Tabelle für die Anfangsklasse anzeigen
-    window.addEventListener('load', () => {
-      renderTable();
-    });
+      summaryDiv.innerHTML = html;
+    }
   </script>
 </body>
 </html>
